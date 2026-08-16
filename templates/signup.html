@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign Up - StudyGraph</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body class="auth-body">
+    <main class="auth-shell">
+      <section class="auth-card">
+        <div class="auth-brand">
+          <div class="brand-mark">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div>
+            <h1>Create account</h1>
+            <p>Make a StudyGraph account so each user gets their own data.</p>
+          </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="flash-stack">
+              {% for category, message in messages %}
+                <div class="flash-banner {{ category }}">{{ message }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <form method="post" class="auth-form">
+          <div class="field-group auth-field-group">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" required autocomplete="email" />
+          </div>
+
+          <div class="field-group auth-field-group">
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" required autocomplete="new-password" />
+          </div>
+
+          <div class="field-group auth-field-group">
+            <label for="confirm_password">Confirm password</label>
+            <input id="confirm_password" name="confirm_password" type="password" required autocomplete="new-password" />
+          </div>
+
+          <div class="field-group auth-field-group">
+            <label for="api_key">OpenAI API Key</label>
+            <input id="api_key" name="api_key" type="text" placeholder="sk-..." />
+          </div>
+
+          <button class="primary-button auth-submit" type="submit">Create Account</button>
+        </form>
+
+        <p class="auth-switch">Already have an account? <a href="{{ url_for('login_page') }}">Log in</a></p>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Library | StudyGraph{% endblock %}
+{% block page_title %}File Library{% endblock %}
+
+{% block content %}
+  <div class="page-card library-page-card">
+    <div class="library-header-row">
+      <div>
+        <h2>File Library</h2>
+        <p class="subtext">
+          Browse uploaded files, review their generated topics, and manage file-level actions.
+        </p>
+      </div>
+
+      <div class="library-count-chip">
+        {{ total_files }} file{% if total_files != 1 %}s{% endif %}
+      </div>
+    </div>
+
+    {% if not library_files %}
+      <div class="library-empty-state card">
+        <i data-lucide="folder-open"></i>
+        <h3>No files yet</h3>
+        <p>Uploaded files will appear here once they have been processed.</p>
+      </div>
+    {% else %}
+      <div class="library-grid">
+        {% for file in library_files %}
+          <article class="library-file-card card">
+            <div class="library-file-top">
+              <div class="library-file-icon-wrap">
+                <i data-lucide="file-text"></i>
+              </div>
+
+              <div class="library-file-meta">
+                <h3 class="library-file-name">{{ file.name }}</h3>
+                <div class="library-file-badges">
+                  <span class="library-badge">{{ file.topic_count }} topic{% if file.topic_count != 1 %}s{% endif %}</span>
+                  <span class="library-badge muted">{{ file.status|replace('_', ' ')|title }}</span>
+                  {% if file.uploaded_at %}
+                    <span class="library-badge muted">{{ file.uploaded_at }}</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <div class="library-section-title">Generated Topics</div>
+
+            {% if file.topics %}
+              <div class="library-topic-list">
+                {% for topic in file.topics %}
+                  <div class="library-topic-row">
+                    <div class="library-topic-copy">
+                      <div class="library-topic-title">{{ topic.title }}</div>
+                      <div class="library-topic-summary">{{ topic.summary }}</div>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="library-topic-empty">No generated topics for this file yet.</div>
+            {% endif %}
+
+            <div class="library-actions-row">
+              <form method="post" class="inline-action-form">
+                <input type="hidden" name="file_id" value="{{ file.id }}" />
+                <input type="hidden" name="action" value="reprocess" />
+                <button type="submit" class="secondary-button library-action-button">Reprocess</button>
+              </form>
+
+              <form method="post" class="inline-action-form" onsubmit="return confirm('Delete this file and all of its topics?');">
+                <input type="hidden" name="file_id" value="{{ file.id }}" />
+                <input type="hidden" name="action" value="delete" />
+                <button type="submit" class="danger-button library-action-button">Delete</button>
+              </form>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  <script>
+    lucide.createIcons();
+  </script>
+{% endblock %}

@@ -1,0 +1,620 @@
+{% extends "base.html" %}
+{% block title %}Ask AI | StudyGraph{% endblock %}
+{% block page_title %}Ask AI{% endblock %}
+
+{% block head %}
+<style>
+  .ask-page-final {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .ask-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ask-topbar p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    max-width: 760px;
+    line-height: 1.6;
+  }
+
+  .topic-count {
+    min-width: 140px;
+    text-align: right;
+  }
+
+  .topic-count .count {
+    display: block;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+  }
+
+  .topic-count .label {
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .ask-main {
+    width: 100%;
+    max-width: none;
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    background: linear-gradient(180deg, #ffffff, #fbfbfc);
+    padding: 32px;
+  }
+
+  .ask-form {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .field-group {
+    margin: 0;
+  }
+
+  .field-group label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 600;
+    font-size: 18px;
+  }
+
+  .topic-search-shell {
+    position: relative;
+  }
+
+  .topic-search-box {
+    min-height: 64px;
+    border: 1px solid #dfe3ea;
+    background: #fbfbfc;
+    border-radius: 18px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    transition: 0.2s ease;
+  }
+
+  .topic-search-box:focus-within {
+    border-color: #b7cceb;
+    box-shadow: 0 0 0 4px rgba(47, 127, 224, 0.09);
+  }
+
+  .topic-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: #eef4ff;
+    color: #416ea7;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .chip-remove {
+    border: none;
+    background: transparent;
+    color: #416ea7;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .topic-search-input {
+    flex: 1 1 220px;
+    min-width: 200px;
+    border: none;
+    background: transparent;
+    outline: none;
+    padding: 8px 6px;
+    font: inherit;
+    color: var(--text);
+  }
+
+  .topic-search-input::placeholder {
+    color: var(--muted);
+  }
+
+  .topic-search-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: #ffffff;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+    overflow: hidden;
+    z-index: 20;
+    display: none;
+  }
+
+  .topic-search-dropdown.is-open {
+    display: block;
+  }
+
+  .topic-search-option,
+  .topic-search-empty {
+    width: 100%;
+    padding: 14px 16px;
+    text-align: left;
+    border: none;
+    background: #ffffff;
+    font: inherit;
+  }
+
+  .topic-search-option {
+    cursor: pointer;
+    color: var(--text);
+  }
+
+  .topic-search-option:hover,
+  .topic-search-option.is-active {
+    background: #f6f9ff;
+  }
+
+  .topic-search-empty {
+    color: var(--muted);
+  }
+
+  .field-group textarea {
+    width: 100%;
+    border: 1px solid #dfe3ea;
+    background: #fbfbfc;
+    border-radius: 16px;
+    padding: 16px 18px;
+    color: var(--text);
+    outline: none;
+    font: inherit;
+    min-height: 132px;
+    resize: vertical;
+    line-height: 1.65;
+  }
+
+  .field-group textarea:focus {
+    border-color: #b7cceb;
+    box-shadow: 0 0 0 4px rgba(47, 127, 224, 0.09);
+  }
+
+  .ask-input-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 56px;
+    gap: 10px;
+    align-items: end;
+  }
+
+  .send-button,
+  .secondary-button {
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .send-button {
+    height: 56px;
+    background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+    color: white;
+    font-size: 28px;
+    box-shadow: 0 10px 22px rgba(47, 127, 224, 0.22);
+  }
+
+  .send-button:hover {
+    transform: translateY(-1px);
+  }
+
+  .question-hint {
+    margin: 8px 0 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .answer-section {
+    margin-top: 30px;
+    padding-top: 26px;
+    border-top: 1px solid var(--border);
+  }
+
+  .answer-section h3 {
+    margin: 0 0 14px;
+    font-size: 24px;
+    letter-spacing: -0.03em;
+  }
+
+  .answer-card {
+    background: #fafbfc;
+    border: 1px dashed #d9e1ec;
+    border-radius: 18px;
+    padding: 22px 24px;
+    color: var(--muted);
+    line-height: 1.8;
+    font-size: 18px;
+  }
+
+  .ask-actions {
+    margin-top: 18px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .secondary-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #f2f4f7;
+    color: #4b5563;
+    padding: 14px 20px;
+    font-size: 17px;
+    text-decoration: none;
+  }
+
+  @media (max-width: 700px) {
+    .ask-main {
+      padding: 22px;
+    }
+
+    .ask-input-row {
+      grid-template-columns: 1fr;
+    }
+
+    .topic-count {
+      text-align: left;
+    }
+
+    .ask-topbar {
+      flex-direction: column;
+    }
+  }
+  .ask-form,
+  .answer-section {
+    width: 100%;
+    max-width: none;
+  }
+
+
+  .markdown-answer {
+    color: var(--text);
+    line-height: 1.8;
+    font-size: 17px;
+  }
+
+  .markdown-answer h1,
+  .markdown-answer h2,
+  .markdown-answer h3,
+  .markdown-answer h4 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    color: var(--text);
+  }
+
+  .markdown-answer p {
+    margin: 0 0 14px;
+  }
+
+  .markdown-answer ul,
+  .markdown-answer ol {
+    margin: 0 0 14px 22px;
+  }
+
+  .markdown-answer li {
+    margin-bottom: 6px;
+  }
+
+  .markdown-answer code {
+    background: #eef2f7;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 0.95em;
+  }
+
+  .markdown-answer pre {
+    background: #f4f7fb;
+    padding: 14px 16px;
+    border-radius: 12px;
+    overflow-x: auto;
+  }
+
+  .markdown-answer blockquote {
+    margin: 0 0 14px;
+    padding-left: 14px;
+    border-left: 3px solid #cfd8e3;
+    color: var(--muted);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card page-card ask-page ask-page-final">
+  <div class="ask-topbar">
+    <div>
+      <h2>Ask AI</h2>
+      <p>
+        Choose one or more topics, then ask a focused question about how they work,
+        connect, or differ from each other.
+      </p>
+    </div>
+    <div class="topic-count">
+      <span class="count">{{ topic_list|length }}</span>
+      <span class="label">topics available</span>
+    </div>
+  </div>
+
+  <div class="ask-main">
+    <form method="POST" class="ask-form" id="askAiForm">
+      <div class="field-group">
+        <label for="topicSearchInput">Topics</label>
+
+        <div class="topic-search-shell">
+          <div class="topic-search-box" id="topicSearchBox">
+            <div id="selectedTopicsChips">
+              {% for topic_id in selected_topic_ids %}
+                {% for topic in topic_list %}
+                  {% if topic.id == topic_id %}
+                  <span class="topic-chip" data-topic-id="{{ topic.id }}">
+                    <span>{{ topic.title }}</span>
+                    <button class="chip-remove" type="button" data-remove-topic="{{ topic.id }}">&times;</button>
+                  </span>
+                  {% endif %}
+                {% endfor %}
+              {% endfor %}
+            </div>
+
+            <input
+              id="topicSearchInput"
+              class="topic-search-input"
+              type="text"
+              placeholder="Search and add topics..."
+              autocomplete="off"
+            >
+          </div>
+
+          <div class="topic-search-dropdown" id="topicSearchDropdown"></div>
+        </div>
+
+        <div id="selectedTopicsInputs">
+          {% for topic_id in selected_topic_ids %}
+          <input type="hidden" name="topics" value="{{ topic_id }}" data-hidden-topic="{{ topic_id }}">
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label for="question">Your question</label>
+        <div class="ask-input-row">
+          <textarea
+            id="question"
+            name="question"
+            placeholder="Ask something specific, like how these topics connect, what the main difference is, or why one matters more in a certain case."
+          >{{ question_text }}</textarea>
+          <button class="send-button" type="submit" aria-label="Send question">&rsaquo;</button>
+        </div>
+        <p class="question-hint">
+          Try questions like “How do these topics connect?” or “What is the main difference between them?”
+        </p>
+      </div>
+    </form>
+
+    <div class="answer-section">
+    <h3>Answer</h3>
+    <div class="answer-card markdown-answer">
+      {% if answer_html %}
+        {{ answer_html | safe }}
+      {% else %}
+        <p>Your AI answer will show up here.</p>
+      {% endif %}
+    </div>
+    <div class="ask-actions">
+      <a class="secondary-button" href="{{ url_for('ask_ai_page') }}">Clear selections</a>
+    </div>
+  </div>
+  </div>
+</div>
+
+<script>
+  (() => {
+    const topicList = {{ topic_list | tojson }};
+    const searchInput = document.getElementById("topicSearchInput");
+    const dropdown = document.getElementById("topicSearchDropdown");
+    const chipsContainer = document.getElementById("selectedTopicsChips");
+    const hiddenInputs = document.getElementById("selectedTopicsInputs");
+    const searchBox = document.getElementById("topicSearchBox");
+
+    if (!searchInput || !dropdown || !chipsContainer || !hiddenInputs || !searchBox) {
+      return;
+    }
+
+    let activeIndex = -1;
+
+    function getSelectedIds() {
+      return Array.from(hiddenInputs.querySelectorAll("input[name='topics']")).map((input) => input.value);
+    }
+
+    function clearDropdown() {
+      dropdown.innerHTML = "";
+      dropdown.classList.remove("is-open");
+      activeIndex = -1;
+    }
+
+    function addHiddenInput(topicId) {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "topics";
+      input.value = topicId;
+      input.dataset.hiddenTopic = topicId;
+      hiddenInputs.appendChild(input);
+    }
+
+    function addChip(topic) {
+      const chip = document.createElement("span");
+      chip.className = "topic-chip";
+      chip.dataset.topicId = topic.id;
+      chip.innerHTML = `
+        <span>${topic.title}</span>
+        <button class="chip-remove" type="button" data-remove-topic="${topic.id}">&times;</button>
+      `;
+      chipsContainer.appendChild(chip);
+    }
+
+    function addTopic(topic) {
+      const selectedIds = getSelectedIds();
+      if (selectedIds.includes(topic.id)) {
+        searchInput.value = "";
+        clearDropdown();
+        return;
+      }
+
+      addHiddenInput(topic.id);
+      addChip(topic);
+      searchInput.value = "";
+      clearDropdown();
+      searchInput.focus();
+    }
+
+    function removeTopic(topicId) {
+      const chip = chipsContainer.querySelector(`[data-topic-id="${topicId}"]`);
+      const input = hiddenInputs.querySelector(`[data-hidden-topic="${topicId}"]`);
+
+      if (chip) {
+        chip.remove();
+      }
+
+      if (input) {
+        input.remove();
+      }
+
+      renderDropdown(searchInput.value.trim());
+    }
+
+    function getFilteredTopics(query) {
+      const selectedIds = getSelectedIds();
+      const normalized = query.toLowerCase();
+
+      return topicList.filter((topic) => {
+        if (selectedIds.includes(topic.id)) {
+          return false;
+        }
+
+        if (!normalized) {
+          return true;
+        }
+
+        return topic.title.toLowerCase().includes(normalized);
+      });
+    }
+
+    function renderDropdown(query) {
+      const filteredTopics = getFilteredTopics(query);
+      dropdown.innerHTML = "";
+
+      if (!filteredTopics.length && query) {
+        const empty = document.createElement("div");
+        empty.className = "topic-search-empty";
+        empty.textContent = "No matching topics";
+        dropdown.appendChild(empty);
+        dropdown.classList.add("is-open");
+        activeIndex = -1;
+        return;
+      }
+
+      if (!filteredTopics.length) {
+        clearDropdown();
+        return;
+      }
+
+      filteredTopics.forEach((topic, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "topic-search-option";
+        button.textContent = topic.title;
+        button.dataset.topicId = topic.id;
+        button.dataset.optionIndex = String(index);
+
+        button.addEventListener("click", () => addTopic(topic));
+        dropdown.appendChild(button);
+      });
+
+      dropdown.classList.add("is-open");
+      activeIndex = -1;
+    }
+
+    function updateActiveOption() {
+      const options = Array.from(dropdown.querySelectorAll(".topic-search-option"));
+      options.forEach((option, index) => {
+        option.classList.toggle("is-active", index === activeIndex);
+      });
+    }
+
+    searchInput.addEventListener("input", () => {
+      renderDropdown(searchInput.value.trim());
+    });
+
+    searchInput.addEventListener("focus", () => {
+      renderDropdown(searchInput.value.trim());
+    });
+
+    searchInput.addEventListener("keydown", (event) => {
+      const options = Array.from(dropdown.querySelectorAll(".topic-search-option"));
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        if (!options.length) {
+          return;
+        }
+        activeIndex = Math.min(activeIndex + 1, options.length - 1);
+        updateActiveOption();
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        if (!options.length) {
+          return;
+        }
+        activeIndex = Math.max(activeIndex - 1, 0);
+        updateActiveOption();
+      } else if (event.key === "Enter") {
+        if (activeIndex >= 0 && options[activeIndex]) {
+          event.preventDefault();
+          options[activeIndex].click();
+        }
+      } else if (event.key === "Backspace" && !searchInput.value.trim()) {
+        const selectedIds = getSelectedIds();
+        if (selectedIds.length) {
+          removeTopic(selectedIds[selectedIds.length - 1]);
+        }
+      }
+    });
+
+    chipsContainer.addEventListener("click", (event) => {
+      const removeButton = event.target.closest("[data-remove-topic]");
+      if (!removeButton) {
+        return;
+      }
+
+      removeTopic(removeButton.dataset.removeTopic);
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!event.target.closest(".topic-search-shell")) {
+        clearDropdown();
+      }
+    });
+
+    searchBox.addEventListener("click", () => {
+      searchInput.focus();
+    });
+  })();
+</script>
+{% endblock %}

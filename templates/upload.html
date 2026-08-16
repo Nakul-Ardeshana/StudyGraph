@@ -1,0 +1,672 @@
+{% extends "base.html" %}
+{% block title %}Upload | StudyGraph{% endblock %}
+{% block page_title %}Upload{% endblock %}
+
+{% block head %}
+<style>
+  .upload-intro {
+    text-align: center;
+    margin: 8px 0 28px;
+  }
+
+  .upload-intro h2 {
+    margin-bottom: 10px;
+    font-size: 22px;
+    font-weight: 600;
+  }
+
+  .upload-intro p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 20px;
+  }
+
+  .upload-form {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  .upload-dropzone {
+    min-height: 280px;
+    border: 2px dashed #dfe4eb;
+    border-radius: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    cursor: pointer;
+    background: linear-gradient(180deg, #fcfcfd, #fafbfc);
+    margin-bottom: 28px;
+    padding: 28px;
+    transition: 0.2s ease;
+    text-align: center;
+  }
+
+  .upload-dropzone.dragover {
+    border-color: #8eb8ef;
+    background: #f7fbff;
+    box-shadow: inset 0 0 0 1px rgba(47, 127, 224, 0.08);
+  }
+
+  .upload-cloud {
+    font-size: 68px;
+    color: #b7cae5;
+    line-height: 1;
+  }
+
+  .accepted-types {
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .selected-files-card {
+    border: 1px solid var(--border);
+    background: #fbfbfc;
+    border-radius: 20px;
+    padding: 18px 18px 10px;
+    margin-bottom: 24px;
+  }
+
+  .selected-files-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+
+  .selected-files-header h3 {
+    margin: 0;
+    font-size: 20px;
+  }
+
+  .selected-files-count {
+    color: var(--muted);
+    font-size: 15px;
+  }
+
+  .selected-files-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .selected-files-list:empty::before {
+    content: "No files selected yet.";
+    color: var(--muted);
+    display: block;
+    padding: 8px 4px 14px;
+  }
+
+  .file-pill {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: white;
+    border: 1px solid var(--border);
+  }
+
+  .file-meta {
+    min-width: 0;
+  }
+
+  .file-name {
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .file-size {
+    font-size: 14px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .remove-file-btn {
+    border: 1px solid #f1caca;
+    background: #fff4f4;
+    color: #c63d3d;
+    border-radius: 12px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .remove-file-btn:hover {
+    background: #ffeaea;
+  }
+
+  .upload-progress-card {
+    border: 1px solid var(--border);
+    background: #fbfbfc;
+    border-radius: 20px;
+    padding: 18px;
+    margin-bottom: 24px;
+    display: none;
+  }
+
+  .upload-progress-card.show {
+    display: block;
+  }
+
+  .upload-progress-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+
+  .upload-progress-header h3 {
+    margin: 0;
+    font-size: 20px;
+  }
+
+  .upload-progress-percent {
+    color: var(--muted);
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .upload-progress-track {
+    width: 100%;
+    height: 12px;
+    overflow: hidden;
+    background: #e9eef5;
+    border-radius: 999px;
+    position: relative;
+  }
+
+  .upload-progress-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--blue), var(--blue-dark));
+    transition: width 0.2s ease;
+  }
+
+  .upload-progress-card.is-processing .upload-progress-fill {
+    width: 42%;
+    position: relative;
+    animation: uploadProcessingPulse 1.25s ease-in-out infinite;
+  }
+
+  .upload-progress-status {
+    margin: 12px 0 0;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .submit-center[disabled],
+  .remove-file-btn[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  @keyframes uploadProcessingPulse {
+    0% {
+      left: -5%;
+      width: 18%;
+    }
+    50% {
+      left: 32%;
+      width: 42%;
+    }
+    100% {
+      left: 87%;
+      width: 18%;
+    }
+  }
+
+  .upload-error-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+
+  .upload-error-modal.show {
+    display: flex;
+  }
+
+  .upload-error-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(3px);
+  }
+
+  .upload-error-dialog {
+    position: relative;
+    z-index: 1;
+    width: min(420px, calc(100vw - 32px));
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 22px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+    padding: 28px 24px 22px;
+    text-align: center;
+  }
+
+  .upload-error-icon {
+    width: 52px;
+    height: 52px;
+    margin: 0 auto 14px;
+    border-radius: 999px;
+    background: #fee2e2;
+    color: #dc2626;
+    display: grid;
+    place-items: center;
+    font-size: 28px;
+    font-weight: 700;
+  }
+
+  .upload-error-dialog h3 {
+    margin: 0 0 10px;
+    font-size: 24px;
+    color: #1f2937;
+  }
+
+  .upload-error-dialog p {
+    margin: 0 0 20px;
+    font-size: 17px;
+    line-height: 1.5;
+    color: #4b5563;
+  }
+
+  .modal-button {
+    min-width: 140px;
+  }
+
+  @media (max-width: 700px) {
+    .upload-intro p {
+      font-size: 18px;
+    }
+
+    .selected-files-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .file-pill {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card page-card upload-page">
+  <div class="upload-intro">
+    <h2>Open your lecture notes, slides, or transcripts here</h2>
+    <p>Drag and drop files or click to upload.</p>
+  </div>
+
+  <form id="uploadForm" method="POST" enctype="multipart/form-data" class="upload-form">
+    <label class="upload-dropzone" id="uploadDropzone" for="lecture-files">
+      <div class="upload-cloud">☁</div>
+      <div class="upload-button">Upload Files</div>
+      <div class="accepted-types">
+        Accepted file types: PDF, TXT, MD, DOCX, PPTX, CSV, JSON
+      </div>
+      <input
+        id="lecture-files"
+        type="file"
+        name="files"
+        multiple
+        accept=".pdf,.txt,.md,.docx,.pptx,.csv,.json"
+        hidden
+      >
+    </label>
+
+    <div class="selected-files-card">
+      <div class="selected-files-header">
+        <h3>Selected files</h3>
+        <div class="selected-files-count" id="selectedFilesCount">0 files</div>
+      </div>
+      <ul class="selected-files-list" id="selectedFilesList"></ul>
+    </div>
+
+
+    <div class="upload-progress-card" id="uploadProgressCard" aria-live="polite">
+      <div class="upload-progress-header">
+        <h3 id="uploadProgressTitle">Uploading files</h3>
+        <div class="upload-progress-percent" id="uploadProgressPercent">0%</div>
+      </div>
+      <div class="upload-progress-track" aria-hidden="true">
+        <div class="upload-progress-fill" id="uploadProgressFill"></div>
+      </div>
+      <p class="upload-progress-status" id="uploadProgressStatus">
+        Preparing your files...
+      </p>
+    </div>
+
+    <div class="field-group">
+      <label for="instructions">Add any additional instructions for the AI <span>(optional)</span></label>
+      <textarea
+        id="instructions"
+        name="instructions"
+        rows="3"
+        placeholder="Type any guidelines or topics you'd like the AI to focus on..."
+      ></textarea>
+    </div>
+
+    <button class="primary-button submit-center" type="submit">Submit</button>
+  </form>
+</div>
+
+<div class="upload-error-modal" id="uploadErrorModal" aria-hidden="true">
+  <div class="upload-error-backdrop"></div>
+  <div
+    class="upload-error-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="uploadErrorTitle"
+    aria-describedby="uploadErrorText"
+  >
+    <div class="upload-error-icon">!</div>
+    <h3 id="uploadErrorTitle">Upload error</h3>
+    <p id="uploadErrorText">Please attach at least one file before submitting.</p>
+    <button type="button" class="primary-button modal-button" id="closeUploadError">
+      Okay
+    </button>
+  </div>
+</div>
+
+<script>
+  const uploadForm = document.getElementById("uploadForm");
+  const fileInput = document.getElementById("lecture-files");
+  const dropzone = document.getElementById("uploadDropzone");
+  const selectedFilesList = document.getElementById("selectedFilesList");
+  const selectedFilesCount = document.getElementById("selectedFilesCount");
+  const uploadErrorModal = document.getElementById("uploadErrorModal");
+  const uploadErrorText = document.getElementById("uploadErrorText");
+  const closeUploadError = document.getElementById("closeUploadError");
+  const uploadProgressCard = document.getElementById("uploadProgressCard");
+  const uploadProgressTitle = document.getElementById("uploadProgressTitle");
+  const uploadProgressPercent = document.getElementById("uploadProgressPercent");
+  const uploadProgressFill = document.getElementById("uploadProgressFill");
+  const uploadProgressStatus = document.getElementById("uploadProgressStatus");
+  const instructionsInput = document.getElementById("instructions");
+  const submitButton = uploadForm.querySelector("button[type='submit']");
+
+  let selectedFiles = [];
+  let isSubmitting = false;
+
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
+  }
+
+  function syncInputFiles() {
+    const dataTransfer = new DataTransfer();
+    selectedFiles.forEach(file => dataTransfer.items.add(file));
+    fileInput.files = dataTransfer.files;
+  }
+
+  function fileKey(file) {
+    return [file.name, file.size, file.lastModified].join("__");
+  }
+
+  function addFiles(fileList) {
+    const existingKeys = new Set(selectedFiles.map(fileKey));
+
+    Array.from(fileList).forEach(file => {
+      const key = fileKey(file);
+      if (!existingKeys.has(key)) {
+        selectedFiles.push(file);
+        existingKeys.add(key);
+      }
+    });
+
+    syncInputFiles();
+    renderSelectedFiles();
+  }
+
+  function removeFile(index) {
+    if (isSubmitting) {
+      return;
+    }
+    selectedFiles.splice(index, 1);
+    syncInputFiles();
+    renderSelectedFiles();
+  }
+
+  function renderSelectedFiles() {
+    selectedFilesList.innerHTML = "";
+    selectedFilesCount.textContent =
+      selectedFiles.length + (selectedFiles.length === 1 ? " file" : " files");
+
+    selectedFiles.forEach((file, index) => {
+      const item = document.createElement("li");
+      item.className = "file-pill";
+
+      item.innerHTML = `
+        <div class="file-meta">
+          <div class="file-name" title="${file.name}">${file.name}</div>
+          <div class="file-size">${formatFileSize(file.size)}</div>
+        </div>
+        <button type="button" class="remove-file-btn" data-index="${index}" ${isSubmitting ? "disabled" : ""}>Remove</button>
+      `;
+
+      selectedFilesList.appendChild(item);
+    });
+
+    selectedFilesList.querySelectorAll(".remove-file-btn").forEach(button => {
+      button.addEventListener("click", function () {
+        removeFile(Number(this.dataset.index));
+      });
+    });
+  }
+
+  function showUploadErrorModal(message) {
+    if (message) {
+      uploadErrorText.textContent = message;
+    }
+    uploadErrorModal.classList.add("show");
+    uploadErrorModal.setAttribute("aria-hidden", "false");
+    closeUploadError.focus();
+  }
+
+  function hideUploadErrorModal() {
+    uploadErrorModal.classList.remove("show");
+    uploadErrorModal.setAttribute("aria-hidden", "true");
+    uploadErrorText.textContent = "Please attach at least one file before submitting.";
+  }
+
+  function setSubmittingState(submitting) {
+    isSubmitting = submitting;
+    fileInput.disabled = submitting;
+    if (instructionsInput) {
+      instructionsInput.disabled = submitting;
+    }
+    if (submitButton) {
+      submitButton.disabled = submitting;
+      submitButton.textContent = submitting ? "Working..." : "Submit";
+    }
+    renderSelectedFiles();
+  }
+
+  function showProgressCard() {
+    uploadProgressCard.classList.add("show");
+  }
+
+  function setUploadProgress(percent, statusText) {
+    showProgressCard();
+    uploadProgressCard.classList.remove("is-processing");
+    uploadProgressTitle.textContent = "Uploading files";
+    uploadProgressPercent.textContent = percent + "%";
+    uploadProgressFill.style.width = percent + "%";
+    uploadProgressStatus.textContent = statusText;
+  }
+
+  function setProcessingProgress() {
+    showProgressCard();
+    uploadProgressCard.classList.add("is-processing");
+    uploadProgressTitle.textContent = "Processing files with AI";
+    uploadProgressPercent.textContent = "Working...";
+    uploadProgressFill.style.width = "42%";
+    uploadProgressStatus.textContent =
+      "Your files have finished uploading. StudyGraph is now extracting topics and building connections.";
+  }
+
+  function hideProgressCard() {
+    uploadProgressCard.classList.remove("show", "is-processing");
+    uploadProgressTitle.textContent = "Uploading files";
+    uploadProgressPercent.textContent = "0%";
+    uploadProgressFill.style.width = "0%";
+    uploadProgressStatus.textContent = "Preparing your files...";
+  }
+
+  fileInput.addEventListener("change", function () {
+    if (this.files && this.files.length > 0) {
+      addFiles(this.files);
+    }
+  });
+
+  ["dragenter", "dragover"].forEach(eventName => {
+    dropzone.addEventListener(eventName, function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!isSubmitting) {
+        dropzone.classList.add("dragover");
+      }
+    });
+  });
+
+  ["dragleave", "dragend"].forEach(eventName => {
+    dropzone.addEventListener(eventName, function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.remove("dragover");
+    });
+  });
+
+  dropzone.addEventListener("drop", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    dropzone.classList.remove("dragover");
+
+    if (isSubmitting) {
+      return;
+    }
+
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      addFiles(e.dataTransfer.files);
+    }
+  });
+
+  uploadForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    if (isSubmitting) {
+      return;
+    }
+
+    if (selectedFiles.length === 0) {
+      showUploadErrorModal("Please attach at least one file before submitting.");
+      return;
+    }
+
+    const formData = new FormData();
+    selectedFiles.forEach(file => formData.append("files", file));
+    if (instructionsInput) {
+      formData.append("instructions", instructionsInput.value || "");
+    }
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", uploadForm.getAttribute("action") || window.location.pathname, true);
+    xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+
+    setSubmittingState(true);
+    setUploadProgress(0, "Preparing your files for upload...");
+
+    xhr.upload.addEventListener("progress", function (event) {
+      if (!event.lengthComputable) {
+        return;
+      }
+      const percent = Math.min(99, Math.round((event.loaded / event.total) * 100));
+      setUploadProgress(
+        percent,
+        `Uploaded ${formatFileSize(event.loaded)} of ${formatFileSize(event.total)}`
+      );
+    });
+
+    xhr.upload.addEventListener("load", function () {
+      setUploadProgress(100, "Upload complete.");
+      setProcessingProgress();
+    });
+
+    xhr.addEventListener("load", function () {
+      setSubmittingState(false);
+
+      let data = null;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch (error) {
+        data = null;
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300 && data && data.ok) {
+        window.location.href = data.redirect_url || "/library";
+        return;
+      }
+
+      hideProgressCard();
+      const message = data && data.error
+        ? data.error
+        : "Something went wrong while uploading your files.";
+      showUploadErrorModal(message);
+    });
+
+    xhr.addEventListener("error", function () {
+      setSubmittingState(false);
+      hideProgressCard();
+      showUploadErrorModal("Network error while uploading. Please try again.");
+    });
+
+    xhr.addEventListener("abort", function () {
+      setSubmittingState(false);
+      hideProgressCard();
+      showUploadErrorModal("Upload was canceled.");
+    });
+
+    xhr.send(formData);
+  });
+
+  closeUploadError.addEventListener("click", hideUploadErrorModal);
+
+  uploadErrorModal.addEventListener("click", function (e) {
+    if (
+      e.target.classList.contains("upload-error-backdrop") ||
+      e.target === uploadErrorModal
+    ) {
+      hideUploadErrorModal();
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && uploadErrorModal.classList.contains("show")) {
+      hideUploadErrorModal();
+    }
+  });
+
+  renderSelectedFiles();
+</script>
+{% endblock %}

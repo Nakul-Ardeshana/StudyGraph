@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}StudyGraph{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+
+    <style>
+      .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .user-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        border: 1px solid #dbe3f0;
+        background: rgba(255, 255, 255, 0.85);
+        color: #1f2937;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .user-chip svg {
+        width: 16px;
+        height: 16px;
+        color: #4f7fb7;
+      }
+
+      .avatar-menu {
+        position: relative;
+      }
+
+      .avatar-button {
+        width: 44px;
+        height: 44px;
+        border-radius: 999px;
+        border: 1px solid #dbe3f0;
+        background: linear-gradient(135deg, #3f8ef0, #2f7fe0);
+        color: white;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 10px 20px rgba(47, 127, 224, 0.18);
+        transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+      }
+
+      .avatar-button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 14px 24px rgba(47, 127, 224, 0.22);
+        filter: brightness(1.02);
+      }
+
+      .avatar-button:focus-visible,
+      .dropdown-item:focus-visible,
+      .modal-button:focus-visible,
+      .logout-button:focus-visible {
+        outline: 3px solid rgba(47, 127, 224, 0.22);
+        outline-offset: 2px;
+      }
+
+      .avatar-button svg {
+        width: 18px;
+        height: 18px;
+        stroke-width: 2.2;
+      }
+
+      .avatar-dropdown {
+        position: absolute;
+        top: calc(100% + 10px);
+        right: 0;
+        min-width: 240px;
+        padding: 8px;
+        border: 1px solid #e5eaf2;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+        backdrop-filter: blur(10px);
+        display: none;
+        z-index: 110;
+      }
+
+      .avatar-dropdown.open {
+        display: block;
+      }
+
+      .dropdown-user {
+        padding: 10px 12px 12px;
+        border-bottom: 1px solid #edf1f7;
+        margin-bottom: 6px;
+      }
+
+      .dropdown-user-label {
+        color: #6b7280;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .dropdown-user-email {
+        margin-top: 6px;
+        color: #111827;
+        font-size: 14px;
+        font-weight: 600;
+        overflow-wrap: anywhere;
+      }
+
+      .dropdown-section-label {
+        margin: 2px 8px 8px;
+        color: #6b7280;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .dropdown-item,
+      .logout-button {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 12px;
+        border: none;
+        border-radius: 12px;
+        background: transparent;
+        color: #1f2937;
+        text-align: left;
+        cursor: pointer;
+        font: inherit;
+        transition: background 0.18s ease;
+      }
+
+      .dropdown-item:hover,
+      .logout-button:hover {
+        background: #f4f7fb;
+      }
+
+      .logout-button {
+        color: #a92d2d;
+      }
+
+      .mobile-edit-topics-link {
+        text-decoration: none;
+      }
+
+      .mobile-edit-topics-link.active {
+        background: #eef4ff;
+      }
+
+      @media (min-width: 821px) {
+        .mobile-edit-topics-link {
+          display: none;
+        }
+      }
+
+      .dropdown-item svg,
+      .logout-button svg {
+        width: 18px;
+        height: 18px;
+        stroke-width: 2;
+        color: #4f7fb7;
+        flex-shrink: 0;
+      }
+
+      .logout-button svg {
+        color: #c24141;
+      }
+
+      .dropdown-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .dropdown-title {
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+
+      .dropdown-subtitle {
+        color: #6b7280;
+        font-size: 12px;
+        line-height: 1.3;
+      }
+
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.45);
+        opacity: 0;
+        pointer-events: none;
+        transition: 0.18s ease;
+        z-index: 120;
+      }
+
+      .modal-overlay.open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .modal {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: min(92vw, 420px);
+        transform: translate(-50%, -50%) scale(0.96);
+        background: #ffffff;
+        border: 1px solid #e7ebf2;
+        padding: 24px;
+        border-radius: 22px;
+        box-shadow: 0 24px 64px rgba(15, 23, 42, 0.2);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        z-index: 121;
+      }
+
+      .modal.open {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      .modal-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .modal-title-group h3 {
+        margin: 0 0 6px;
+        font-size: 22px;
+        letter-spacing: -0.03em;
+        color: #111827;
+      }
+
+      .modal-title-group p {
+        margin: 0;
+        color: #6b7280;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .modal-close {
+        width: 38px;
+        height: 38px;
+        border: none;
+        border-radius: 999px;
+        background: #f3f5f8;
+        color: #4b5563;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      .modal-close:hover {
+        background: #e9edf2;
+      }
+
+      .modal-field label {
+        display: block;
+        margin-bottom: 8px;
+        color: #374151;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .modal-field input {
+        width: 100%;
+        padding: 13px 14px;
+        border-radius: 14px;
+        border: 1px solid #d8dee8;
+        background: #fbfcfe;
+        font: inherit;
+        color: #111827;
+      }
+
+      .modal-field input:focus {
+        outline: none;
+        border-color: #b7cceb;
+        box-shadow: 0 0 0 4px rgba(47, 127, 224, 0.09);
+      }
+
+      .modal-help {
+        margin: 10px 0 0;
+        color: #6b7280;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .modal-button {
+        border: none;
+        border-radius: 14px;
+        padding: 12px 16px;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .modal-button.secondary {
+        background: #f2f4f7;
+        color: #4b5563;
+      }
+
+      .modal-button.secondary:hover {
+        background: #e9edf2;
+      }
+
+      .modal-button.primary {
+        background: linear-gradient(135deg, #3f8ef0, #2f7fe0);
+        color: white;
+        box-shadow: 0 10px 18px rgba(47, 127, 224, 0.18);
+      }
+
+      .modal-button.primary:hover {
+        filter: brightness(1.02);
+      }
+
+      @media (max-width: 820px) {
+        .topbar-right {
+          gap: 8px;
+        }
+
+        .user-chip {
+          display: none;
+        }
+
+        .avatar-dropdown {
+          right: 0;
+          left: auto;
+          min-width: min(260px, calc(100vw - 40px));
+        }
+
+        .modal {
+          width: min(92vw, 400px);
+          border-radius: 20px;
+          padding: 20px;
+        }
+      }
+    </style>
+
+    {% block head %}{% endblock %}
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div class="brand-name">StudyGraph</div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <a href="{{ url_for('upload_page') }}" class="nav-item {% if active_page == 'upload' %}active{% endif %}">
+            <i data-lucide="upload" class="nav-icon"></i>
+            <span>Upload</span>
+          </a>
+          <a href="{{ url_for('library_page') }}" class="nav-item {% if active_page == 'library' %}active{% endif %}">
+            <i data-lucide="folder-open" class="nav-icon"></i>
+            <span>Library</span>
+          </a>
+          <a href="{{ url_for('matrix_page') }}" class="nav-item {% if active_page == 'matrix' %}active{% endif %}">
+            <i data-lucide="git-branch" class="nav-icon"></i>
+            <span>Matrix</span>
+          </a>
+          <a href="{{ url_for('cards_page') }}" class="nav-item {% if active_page == 'cards' %}active{% endif %}">
+            <i data-lucide="layers" class="nav-icon"></i>
+            <span>Cards</span>
+          </a>
+          <a href="{{ url_for('quiz_page') }}" class="nav-item {% if active_page == 'quiz' %}active{% endif %}">
+            <i data-lucide="clipboard-list" class="nav-icon"></i>
+            <span>Quiz</span>
+          </a>
+          <a href="{{ url_for('ask_ai_page') }}" class="nav-item {% if active_page == 'ask_ai' %}active{% endif %}">
+            <i data-lucide="sparkles" class="nav-icon"></i>
+            <span>Ask AI</span>
+          </a>
+        </nav>
+
+        <div class="sidebar-footer">
+          <a href="{{ url_for('edit_topics_page') }}" class="edit-button {% if active_page == 'edit_topics' %}active{% endif %}">
+            <i data-lucide="settings-2" class="nav-icon"></i>
+            <span>Edit Topics</span>
+          </a>
+        </div>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div class="topbar-left">
+            <h1>{% block page_title %}StudyGraph{% endblock %}</h1>
+          </div>
+
+          <div class="topbar-right">
+            {% if current_user %}
+              <div class="user-chip">
+                <i data-lucide="mail"></i>
+                <span>{{ current_user.email }}</span>
+              </div>
+
+              <div class="avatar-menu">
+                <button class="avatar-button" id="avatarButton" type="button" aria-label="Open user menu" aria-expanded="false">
+                  <i data-lucide="user"></i>
+                </button>
+
+                <div class="avatar-dropdown" id="avatarDropdown" role="menu">
+                  <div class="dropdown-user">
+                    <div class="dropdown-user-label">Signed in as</div>
+                    <div class="dropdown-user-email">{{ current_user.email }}</div>
+                  </div>
+
+                  <div class="dropdown-section-label">Settings</div>
+
+                  <a
+                    href="{{ url_for('edit_topics_page') }}"
+                    class="dropdown-item mobile-edit-topics-link {% if active_page == 'edit_topics' %}active{% endif %}"
+                    id="mobileEditTopicsLink"
+                    role="menuitem"
+                  >
+                    <i data-lucide="settings-2"></i>
+                    <span class="dropdown-copy">
+                      <span class="dropdown-title">Edit Topics</span>
+                      <span class="dropdown-subtitle">Manage visible topics on mobile</span>
+                    </span>
+                  </a>
+
+                  <button class="dropdown-item" id="openOpenAIApiKeyModal" type="button" role="menuitem">
+                    <i data-lucide="key-round"></i>
+                    <span class="dropdown-copy">
+                      <span class="dropdown-title">Set API Key</span>
+                      <span class="dropdown-subtitle">Save your OpenAI key to your account</span>
+                    </span>
+                  </button>
+
+                  <form action="{{ url_for('logout_page') }}" method="post">
+                    <button class="logout-button" type="submit" role="menuitem">
+                      <i data-lucide="log-out"></i>
+                      <span class="dropdown-copy">
+                        <span class="dropdown-title">Log Out</span>
+                        <span class="dropdown-subtitle">End this session on this device</span>
+                      </span>
+                    </button>
+                  </form>
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        </header>
+
+        <section class="content-area">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              <div class="flash-stack">
+                {% for category, message in messages %}
+                  <div class="flash-banner {{ category }}">{{ message }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% endwith %}
+
+          {% block content %}{% endblock %}
+        </section>
+      </main>
+    </div>
+
+    <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+      <a href="{{ url_for('upload_page') }}" class="mobile-bottom-item {% if active_page == 'upload' %}active{% endif %}">
+        <i data-lucide="upload" class="nav-icon"></i>
+        <span>Upload</span>
+      </a>
+      <a href="{{ url_for('library_page') }}" class="mobile-bottom-item {% if active_page == 'library' %}active{% endif %}">
+        <i data-lucide="folder-open" class="nav-icon"></i>
+        <span>Library</span>
+      </a>
+      <a href="{{ url_for('matrix_page') }}" class="mobile-bottom-item {% if active_page == 'matrix' %}active{% endif %}">
+        <i data-lucide="git-branch" class="nav-icon"></i>
+        <span>Matrix</span>
+      </a>
+      <a href="{{ url_for('cards_page') }}" class="mobile-bottom-item {% if active_page == 'cards' %}active{% endif %}">
+        <i data-lucide="layers" class="nav-icon"></i>
+        <span>Cards</span>
+      </a>
+      <a href="{{ url_for('quiz_page') }}" class="mobile-bottom-item {% if active_page == 'quiz' %}active{% endif %}">
+        <i data-lucide="clipboard-list" class="nav-icon"></i>
+        <span>Quiz</span>
+      </a>
+      <a href="{{ url_for('ask_ai_page') }}" class="mobile-bottom-item {% if active_page == 'ask_ai' %}active{% endif %}">
+        <i data-lucide="sparkles" class="nav-icon"></i>
+        <span>Ask AI</span>
+      </a>
+    </nav>
+
+    {% if current_user %}
+      <div class="modal-overlay" id="apiModalOverlay"></div>
+
+      <div class="modal" id="apiModal" aria-hidden="true">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <h3>Set API Key</h3>
+            <p>Save your OpenAI API key to your account so uploads and Ask AI can use it.</p>
+          </div>
+
+          <button class="modal-close" id="closeApiModalIcon" type="button" aria-label="Close dialog">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <form method="post" action="{{ url_for('save_api_key_page') }}">
+          <div class="modal-field">
+            <label for="apiKeyInput">OpenAI API key</label>
+            <input
+              type="password"
+              id="apiKeyInput"
+              name="api_key"
+              placeholder="sk-..."
+              autocomplete="off"
+              spellcheck="false"
+              value="{{ current_user.openai_api_key or '' }}"
+            />
+            <p class="modal-help">This is now stored on the backend for your account instead of only in local storage.</p>
+          </div>
+
+          <div class="modal-actions">
+            <button class="modal-button secondary" id="closeApiModal" type="button">Cancel</button>
+            <button class="modal-button primary" type="submit">Save Key</button>
+          </div>
+        </form>
+      </div>
+    {% endif %}
+
+    <script>
+      lucide.createIcons();
+
+      const avatarButton = document.getElementById("avatarButton");
+      const avatarDropdown = document.getElementById("avatarDropdown");
+      const apiModal = document.getElementById("apiModal");
+      const apiOverlay = document.getElementById("apiModalOverlay");
+      const openOpenAIApiKeyModal = document.getElementById("openOpenAIApiKeyModal");
+      const closeApiModal = document.getElementById("closeApiModal");
+      const closeApiModalIcon = document.getElementById("closeApiModalIcon");
+      const apiKeyInput = document.getElementById("apiKeyInput");
+
+      function setAvatarMenuOpen(isOpen) {
+        if (!avatarDropdown || !avatarButton) return;
+        avatarDropdown.classList.toggle("open", isOpen);
+        avatarButton.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      }
+
+      function openModal() {
+        if (!apiModal || !apiOverlay) return;
+        setAvatarMenuOpen(false);
+        apiModal.classList.add("open");
+        apiOverlay.classList.add("open");
+        apiModal.setAttribute("aria-hidden", "false");
+        window.setTimeout(() => apiKeyInput && apiKeyInput.focus(), 0);
+      }
+
+      function closeModal() {
+        if (!apiModal || !apiOverlay) return;
+        apiModal.classList.remove("open");
+        apiOverlay.classList.remove("open");
+        apiModal.setAttribute("aria-hidden", "true");
+      }
+
+      if (avatarButton) {
+        avatarButton.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const isOpen = avatarDropdown && avatarDropdown.classList.contains("open");
+          setAvatarMenuOpen(!isOpen);
+        });
+      }
+
+      if (openOpenAIApiKeyModal) openOpenAIApiKeyModal.addEventListener("click", openModal);
+      if (closeApiModal) closeApiModal.addEventListener("click", closeModal);
+      if (closeApiModalIcon) closeApiModalIcon.addEventListener("click", closeModal);
+      if (apiOverlay) apiOverlay.addEventListener("click", closeModal);
+
+      document.addEventListener("click", (event) => {
+        if (!event.target.closest(".avatar-menu")) {
+          setAvatarMenuOpen(false);
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          setAvatarMenuOpen(false);
+          closeModal();
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+{% block title %}Edit Topics | StudyGraph{% endblock %}
+{% block page_title %}Edit Topics{% endblock %}
+
+{% block head %}
+<style>
+  .edit-topics-final {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .edit-topics-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .edit-topics-topbar p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    max-width: 760px;
+    line-height: 1.6;
+  }
+
+  .topic-count {
+    min-width: 140px;
+    text-align: right;
+  }
+
+  .topic-count .count {
+    display: block;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+  }
+
+  .topic-count .label {
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .edit-shell {
+    width: 100%;
+    max-width: none;
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    background: linear-gradient(180deg, #ffffff, #fbfbfc);
+    padding: 32px;
+  }
+
+  .edit-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 22px;
+  }
+
+  .toolbar-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .search-input {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid #dfe3ea;
+    background: #fbfbfc;
+    border-radius: 16px;
+    padding: 14px 16px;
+    color: var(--text);
+    outline: none;
+    font: inherit;
+  }
+
+  .search-input:focus {
+    border-color: #b7cceb;
+    box-shadow: 0 0 0 4px rgba(47, 127, 224, 0.09);
+  }
+
+  .toolbar-note {
+    color: var(--muted);
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .ghost-button,
+  .danger-button-alt {
+    border: none;
+    border-radius: 16px;
+    padding: 14px 18px;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .ghost-button {
+    background: #f2f4f7;
+    color: #4b5563;
+  }
+
+  .ghost-button:hover {
+    background: #e9edf2;
+  }
+
+  .danger-button-alt {
+    background: #d64545;
+    color: #ffffff;
+  }
+
+  .danger-button-alt:hover {
+    background: #c83737;
+  }
+
+  .topics-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    width: 100%;
+    max-width: none;
+    margin-top: 0;
+  }
+
+  .topics-list {
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: #ffffff;
+    max-height: 460px;
+    
+  }
+
+  .topic-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 14px;
+    align-items: center;
+    padding: 18px 18px;
+    border-top: 1px solid var(--border);
+  }
+
+  .topic-row:first-child {
+    border-top: none;
+  }
+
+  .topic-row.is-hidden {
+    display: none;
+  }
+
+  .topic-check {
+    width: 22px;
+    height: 22px;
+    accent-color: var(--blue);
+  }
+
+  .topic-main {
+    min-width: 0;
+  }
+
+  .topic-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .topic-meta {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .empty-list {
+    display: none;
+    border: 1px dashed #d9e1ec;
+    background: #fcfdff;
+    border-radius: 18px;
+    padding: 22px 24px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .bulk-actions {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 16px 0 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0), #fff 24px);
+  }
+
+  .selection-status {
+    color: var(--muted);
+    font-size: 15px;
+  }
+
+  @media (max-width: 820px) {
+    .edit-toolbar {
+      grid-template-columns: 1fr;
+    }
+
+    .topic-count {
+      text-align: left;
+    }
+
+    .edit-topics-topbar {
+      flex-direction: column;
+    }
+
+    .bulk-actions {
+      align-items: stretch;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card page-card edit-topics-page edit-topics-final">
+  <div class="edit-topics-topbar">
+    <div>
+      <h2>Edit Topics</h2>
+      <p>
+        Review the extracted topics, remove anything you do not want, and keep your study graph focused.
+      </p>
+    </div>
+    <div class="topic-count">
+      <span class="count" id="topicCount">{{ topic_list|length }}</span>
+      <span class="label">topics available</span>
+    </div>
+  </div>
+
+  <div class="edit-shell">
+    <form method="POST" class="topics-form" id="editTopicsForm">
+      <div class="edit-toolbar">
+        <input
+          type="text"
+          id="topicSearch"
+          class="search-input"
+          placeholder="Search topics..."
+          autocomplete="off"
+        >
+        <div class="toolbar-actions">
+          <button type="button" class="ghost-button" id="selectAllBtn">Select visible</button>
+          <button type="button" class="ghost-button" id="deselectAllBtn">Deselect visible</button>
+        </div>
+        <span class="toolbar-note">Use search to narrow the list before deleting.</span>
+      </div>
+
+      <div class="topics-list" id="topicsList">
+        {% for topic in topic_list %}
+        <label class="topic-row" data-topic-title="{{ topic.title|lower }}">
+          <input class="topic-check" type="checkbox" name="topics" value="{{ topic.id }}">
+          <div class="topic-main">
+            <p class="topic-title">{{ topic.title }}</p>
+            <p class="topic-meta">
+              {{ topic.lectures|length }} lecture{% if topic.lectures|length != 1 %}s{% endif %}
+              {% if topic.summary %}• {{ topic.summary[:110] }}{% if topic.summary|length > 110 %}...{% endif %}{% endif %}
+            </p>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+
+      <div class="empty-list" id="emptyListState">
+        No topics match your search right now.
+      </div>
+
+      <div class="bulk-actions">
+        <span class="selection-status" id="selectionStatus">0 topics selected</span>
+        <button class="danger-button-alt" type="submit">Delete Selected</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  (() => {
+    const searchInput = document.getElementById("topicSearch");
+    const topicsList = document.getElementById("topicsList");
+    const emptyListState = document.getElementById("emptyListState");
+    const selectionStatus = document.getElementById("selectionStatus");
+    const selectAllBtn = document.getElementById("selectAllBtn");
+    const topicCount = document.getElementById("topicCount");
+    const deselectAllBtn = document.getElementById("deselectAllBtn");
+
+    if (!searchInput || !topicsList || !emptyListState || !selectionStatus || !selectAllBtn || !deselectAllBtn || !topicCount) {
+      return;
+    }
+
+    const rows = Array.from(topicsList.querySelectorAll(".topic-row"));
+
+    function updateVisibleState() {
+      const visibleRows = rows.filter((row) => !row.classList.contains("is-hidden"));
+      emptyListState.style.display = visibleRows.length ? "none" : "block";
+    }
+
+    function updateSelectionStatus() {
+      const selectedCount = rows.filter((row) => {
+        const checkbox = row.querySelector(".topic-check");
+        return checkbox && checkbox.checked;
+      }).length;
+
+      selectionStatus.textContent = `${selectedCount} topic${selectedCount === 1 ? "" : "s"} selected`;
+    }
+
+    function updateTopicCount() {
+      const visibleRows = rows.filter((row) => !row.classList.contains("is-hidden")).length;
+      topicCount.textContent = String(visibleRows);
+    }
+
+    function filterRows(query) {
+      const normalized = query.trim().toLowerCase();
+
+      rows.forEach((row) => {
+        const title = row.dataset.topicTitle || "";
+        const matches = !normalized || title.includes(normalized);
+        row.classList.toggle("is-hidden", !matches);
+      });
+
+      updateVisibleState();
+      updateTopicCount();
+    }
+
+    searchInput.addEventListener("input", () => {
+      filterRows(searchInput.value);
+    });
+
+    rows.forEach((row) => {
+      const checkbox = row.querySelector(".topic-check");
+      if (checkbox) {
+        checkbox.addEventListener("change", updateSelectionStatus);
+      }
+    });
+
+    selectAllBtn.addEventListener("click", () => {
+      rows.forEach((row) => {
+        if (!row.classList.contains("is-hidden")) {
+          const checkbox = row.querySelector(".topic-check");
+          if (checkbox) {
+            checkbox.checked = true;
+          }
+        }
+      });
+      updateSelectionStatus();
+    });
+
+    deselectAllBtn.addEventListener("click", () => {
+      rows.forEach((row) => {
+        if (!row.classList.contains("is-hidden")) {
+          const checkbox = row.querySelector(".topic-check");
+          if (checkbox) {
+            checkbox.checked = false;
+          }
+        }
+      });
+      updateSelectionStatus();
+    });
+
+    updateVisibleState();
+    updateSelectionStatus();
+    updateTopicCount();
+  })();
+</script>
+{% endblock %}

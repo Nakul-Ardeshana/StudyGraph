@@ -1,0 +1,371 @@
+{% extends "base.html" %} {% block title %}Quiz | StudyGraph{% endblock %} {%
+block page_title %}Quiz{% endblock %} {% block head %}
+<style>
+  .quiz-page-final {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .quiz-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .quiz-topbar p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    max-width: 760px;
+    line-height: 1.6;
+  }
+
+  .quiz-progress {
+    min-width: 140px;
+    text-align: right;
+  }
+
+  .quiz-progress .count {
+    display: block;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+  }
+
+  .quiz-progress .label {
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .quiz-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .quiz-main {
+    width: width: min(100%, 1100px);
+    margin: 0 auto;
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    background: linear-gradient(180deg, #ffffff, #fbfbfc);
+    padding: 32px;
+    max-width: none;
+  }
+
+  .quiz-main h3 {
+    margin: 0 0 18px;
+    font-size: 28px;
+    letter-spacing: -0.04em;
+  }
+
+  .quiz-topic-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: #eef4ff;
+    color: #416ea7;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 18px;
+  }
+
+  .quiz-question {
+    margin: 0 0 24px;
+    font-size: 30px;
+    line-height: 1.3;
+    letter-spacing: -0.03em;
+  }
+
+  .quiz-options {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .quiz-option {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 18px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: #fff;
+    font-size: 18px;
+    line-height: 1.55;
+    cursor: pointer;
+    transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .quiz-option:hover {
+    border-color: #cdd8e6;
+    background: #fafcff;
+  }
+
+  .quiz-option input {
+    margin-top: 4px;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--blue);
+    flex-shrink: 0;
+  }
+
+  .quiz-option span {
+    flex: 1;
+  }
+
+  .quiz-option.selected {
+    border-color: #7aa8e8;
+    background: #eef5ff;
+    box-shadow: 0 0 0 3px rgba(63, 142, 240, 0.12);
+  }
+
+  .quiz-option.selected input {
+    accent-color: #2f7fe0;
+  }
+
+  .quiz-option:has(input:checked) {
+    border-color: #7aa8e8;
+    background: #eef5ff;
+    box-shadow: 0 0 0 3px rgba(63, 142, 240, 0.12);
+  }
+
+  .quiz-option:has(input:focus-visible) {
+    box-shadow: 0 0 0 4px rgba(63, 142, 240, 0.16);
+  }
+
+  .quiz-option.correct {
+    border-color: #cfe9da;
+    background: #edf8f1;
+    color: #256a48;
+    box-shadow: 0 0 0 3px rgba(37, 106, 72, 0.08);
+  }
+
+  .quiz-option.incorrect {
+    border-color: #f0d0d0;
+    background: #fff2f2;
+    color: #9a3d3d;
+    box-shadow: 0 0 0 3px rgba(154, 61, 61, 0.08);
+  }
+
+  .quiz-option.correct {
+    border-color: #cfe9da;
+    background: #edf8f1;
+    color: #256a48;
+  }
+
+  .quiz-option.incorrect {
+    border-color: #f0d0d0;
+    background: #fff2f2;
+    color: #9a3d3d;
+  }
+
+  .quiz-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+  }
+
+  .quiz-note {
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .feedback-card {
+    margin-top: 24px;
+    padding: 24px;
+    border-radius: 22px;
+  }
+
+  .feedback-card.success {
+    background: var(--success);
+    color: var(--success-text);
+  }
+
+  .feedback-card.error {
+    background: #fff4f4;
+    color: #9a3d3d;
+  }
+
+  .feedback-card h4 {
+    margin: 0 0 8px;
+    font-size: 22px;
+    letter-spacing: -0.03em;
+  }
+
+  .feedback-card p {
+    margin: 0;
+    font-size: 17px;
+    line-height: 1.65;
+  }
+
+  .empty-state {
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    background: linear-gradient(180deg, #ffffff, #fbfbfc);
+    padding: 32px;
+  }
+
+  .empty-state h3 {
+    margin: 0 0 10px;
+    font-size: 26px;
+  }
+
+  .empty-state p {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  @media (max-width: 1100px) {
+    .quiz-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .quiz-progress {
+      text-align: left;
+    }
+
+    .quiz-topbar {
+      flex-direction: column;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .quiz-main,
+    .empty-state {
+      padding: 22px;
+    }
+
+    .quiz-question {
+      font-size: 24px;
+    }
+
+    .quiz-option {
+      padding: 15px 16px;
+      border-radius: 18px;
+    }
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="card page-card quiz-page quiz-page-final">
+  <div class="quiz-topbar">
+    <div>
+      <h2>Quiz</h2>
+      <p>
+        Test your understanding one topic at a time. Each question uses a real
+        topic from your lecture graph, and the answer choices are pulled from
+        other topic summaries.
+      </p>
+    </div>
+    <div class="quiz-progress">
+      <span class="count">
+        {% if total_questions %} {{ current_number }} / {{ total_questions }} {%
+        else %} 0 / 0 {% endif %}
+      </span>
+      <span class="label">questions in this deck</span>
+    </div>
+  </div>
+
+  {% if question %}
+  <div class="quiz-layout">
+    <div class="quiz-main">
+      <span class="quiz-topic-badge">Topic</span>
+      <h3>{{ question.topic_title }}</h3>
+      <p class="quiz-question">{{ question.prompt }}</p>
+
+      <form method="POST" action="{{ url_for('quiz_page', q=question.index) }}">
+        <div class="quiz-options">
+          {% for option in question.options %} {% set is_selected =
+          selected_option_index == option.index %} {% set show_result = result
+          is not none %} {% set option_class = '' %} {% if show_result %} {% if
+          option.is_correct %} {% set option_class = 'correct' %} {% elif
+          is_selected and not option.is_correct %} {% set option_class =
+          'incorrect' %} {% endif %} {% elif is_selected %} {% set option_class
+          = 'selected' %} {% endif %}
+
+          <label class="quiz-option {{ option_class }}">
+            <input
+              type="radio"
+              name="answer"
+              value="{{ option.index }}"
+              {%
+              if
+              is_selected
+              %}checked{%
+              endif
+              %}
+              {%
+              if
+              result
+              %}disabled{%
+              endif
+              %}
+            />
+            <span>{{ option.text }}</span>
+          </label>
+          {% endfor %}
+        </div>
+
+        {% if not result %}
+        <div class="quiz-actions">
+          <button class="primary-button" type="submit">Submit Answer</button>
+          <span class="quiz-note"
+            >Choose the summary that best matches the topic.</span
+          >
+        </div>
+        {% endif %}
+      </form>
+
+      {% if result %}
+      <div
+        class="feedback-card {% if result.is_correct %}success{% else %}error{% endif %}"
+      >
+        <h4>
+          {% if result.is_correct %} Correct {% else %} Not quite {% endif %}
+        </h4>
+        <p>
+          {% if result.is_correct %} Nice. You matched
+          <strong>{{ question.topic_title }}</strong> to the right summary. {%
+          else %} The correct answer for
+          <strong>{{ question.topic_title }}</strong> was:
+          <strong>{{ result.correct_text }}</strong>
+          {% endif %}
+        </p>
+      </div>
+
+      <div class="quiz-actions">
+        <a
+          class="primary-button"
+          href="{{ url_for('quiz_page', q=next_question_number) }}"
+          >Next Question</a
+        >
+        <a
+          class="secondary-button"
+          href="{{ url_for('quiz_page', q=question.index) }}"
+          >Try Again</a
+        >
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No quiz questions yet</h3>
+    <p>
+      Add some topics and summaries first, then this tab can generate questions
+      from your lecture graph.
+    </p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
