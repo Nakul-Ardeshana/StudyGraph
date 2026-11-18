@@ -30,7 +30,9 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
+    inspect,
     select,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -53,7 +55,6 @@ except ImportError:  # pragma: no cover
 # Flask setup
 # -----------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent
-UPLOAD_ROOT = BASE_DIR / "uploads"
 ALLOWED_UPLOAD_EXTENSIONS = {
     ".pdf",
     ".txt",
@@ -75,6 +76,20 @@ DEFAULT_GRAPH_TEMPLATE: dict[str, Any] = {
 
 BATCH_SIZE = 2
 
+MAX_ID_LENGTH = 120
+
+
+def normalize_database_url(url: str) -> str:
+    """A pasted postgres:// or postgresql:// URL would make SQLAlchemy look for
+    the psycopg2 driver, which isn't installed, so point it at psycopg 3."""
+    url = url.strip()
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://"):]
+    return url
+
+
 app = Flask(__name__)
 load_dotenv()
 
@@ -85,8 +100,17 @@ if not app.secret_key:
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL not set")
+DATABASE_URL = normalize_database_url(DATABASE_URL)
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+UPLOAD_ROOT = Path(os.environ.get("UPLOAD_DIR") or BASE_DIR / "uploads")
+
+app.config.update(
+    # Reject oversized uploads before they are written to disk or sent to OpenAI.
+    MAX_CONTENT_LENGTH=int(os.environ.get("MAX_UPLOAD_MB", "25")) * 1024 * 1024,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+)
 
 engine = create_engine(DATABASE_URL, future=True, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False, future=True)
@@ -137,6 +161,8 @@ class Topic(Base):
     lecture_priority: Mapped[int | None] = mapped_column(Integer, nullable=True)
     difficulty: Mapped[int | None] = mapped_column(Integer, nullable=True)
     lectures_json: Mapped[str] = mapped_column(Text, default="[]")
+    # Insertion order, so "most recent topics" means recent, not alphabetical.
+    position: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="topics")
     file: Mapped[StudyFile | None] = relationship(back_populates="topics")
@@ -173,7 +199,17 @@ class LectureMeta(Base):
     user: Mapped[User] = relationship(back_populates="lecture_metas")
 
 
-Base.metadata.create_all(engine)
+def ensure_schema() -> None:
+    Base.metadata.create_all(engine)
+    # create_all doesn't add columns to tables that already exist, so databases
+    # created before topics.position existed get it added here.
+    topic_columns = {column["name"] for column in inspect(engine).get_columns("topics")}
+    if "position" not in topic_columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE topics ADD COLUMN position INTEGER"))
+
+
+ensure_schema()
 
 
 # -----------------------------------------------------------------------------
@@ -225,6 +261,20 @@ def require_auth_for_private_pages() -> Any:
     return redirect(url_for("login_page", next=request.path))
 
 
+def is_safe_redirect_target(target: str | None) -> bool:
+    """Only allow redirects to paths on this site (blocks open redirects via ?next=)."""
+    if not target:
+        return False
+    target = target.strip()
+    if not target.startswith("/") or target.startswith("//") or target.startswith("/\\"):
+        return False
+    return "\\" not in target and "\n" not in target and "\r" not in target
+
+
+def safe_next_url(target: str | None) -> str:
+    return target.strip() if is_safe_redirect_target(target) else url_for("home")
+
+
 def login_required(view_func):
     @wraps(view_func)
     def wrapped(*args, **kwargs):
@@ -266,6 +316,7 @@ def normalize_graph_schema(lecture_graph: dict[str, Any]) -> dict[str, Any]:
         topic_data.setdefault("lecture_priority", None)
         topic_data.setdefault("difficulty", None)
         topic_data.setdefault("file_id", None)
+        topic_data.setdefault("position", None)
 
         normalized_connections = []
         for connection in topic_data.get("connections", []):
@@ -301,6 +352,7 @@ def db_to_graph(db: Session, user: User) -> dict[str, Any]:
             "difficulty": topic.difficulty,
             "connections": [],
             "file_id": topic.file_id,
+            "position": topic.position,
         }
         if topic.file_id:
             file_topics_map.setdefault(topic.file_id, []).append(topic.id)
@@ -354,9 +406,78 @@ def clear_user_graph(db: Session, user: User) -> None:
     db.query(LectureMeta).filter(LectureMeta.user_id == user.id).delete(synchronize_session=False)
 
 
+def next_free_id(base_id: str, taken: set[str]) -> str:
+    base_id = base_id[: MAX_ID_LENGTH - 8]
+    if base_id not in taken:
+        return base_id
+    suffix = 2
+    while f"{base_id}_{suffix}" in taken:
+        suffix += 1
+    return f"{base_id}_{suffix}"
+
+
+def remap_ids_taken_by_other_users(db: Session, user: User, lecture_graph: dict[str, Any]) -> dict[str, Any]:
+    """Topic and file ids are global primary keys, but the AI picks ids like
+    "binary_search_tree" for every user who uploads the same lecture. Rename any
+    id another user already owns so the insert doesn't hit a duplicate key."""
+    topics = lecture_graph.get("topics", {})
+    files = lecture_graph.get("files", [])
+
+    topic_ids = list(topics.keys())
+    file_ids = [file_data.get("id") for file_data in files if file_data.get("id")]
+
+    taken_topics = set(
+        db.scalars(select(Topic.id).where(Topic.user_id != user.id, Topic.id.in_(topic_ids))).all()
+    ) if topic_ids else set()
+    taken_files = set(
+        db.scalars(select(StudyFile.id).where(StudyFile.user_id != user.id, StudyFile.id.in_(file_ids))).all()
+    ) if file_ids else set()
+
+    if not taken_topics and not taken_files:
+        return lecture_graph
+
+    topic_map: dict[str, str] = {}
+    if taken_topics:
+        used = set(topic_ids) | taken_topics
+        for topic_id in topic_ids:
+            if topic_id in taken_topics:
+                new_id = next_free_id(f"{topic_id}_u{user.id}", used)
+                used.add(new_id)
+                topic_map[topic_id] = new_id
+
+    file_map: dict[str, str] = {}
+    if taken_files:
+        used = set(file_ids) | taken_files
+        for file_id in file_ids:
+            if file_id in taken_files:
+                new_id = next_free_id(f"{file_id}_u{user.id}", used)
+                used.add(new_id)
+                file_map[file_id] = new_id
+
+    remapped_topics: dict[str, dict[str, Any]] = {}
+    for topic_id, topic_data in topics.items():
+        topic_data["connections"] = [
+            set_connection_target(connection, topic_map.get(get_connection_target(connection), get_connection_target(connection)))
+            for connection in topic_data.get("connections", [])
+        ]
+        if topic_data.get("file_id") in file_map:
+            topic_data["file_id"] = file_map[topic_data["file_id"]]
+        remapped_topics[topic_map.get(topic_id, topic_id)] = topic_data
+    lecture_graph["topics"] = remapped_topics
+
+    for file_data in files:
+        if file_data.get("id") in file_map:
+            file_data["id"] = file_map[file_data["id"]]
+        file_data["topics"] = [topic_map.get(topic_id, topic_id) for topic_id in file_data.get("topics", [])]
+
+    return lecture_graph
+
+
 def graph_to_db(db: Session, user: User, lecture_graph: dict[str, Any]) -> None:
     lecture_graph = validate_graph(lecture_graph)
     clear_user_graph(db, user)
+    db.flush()
+    lecture_graph = remap_ids_taken_by_other_users(db, user, lecture_graph)
 
     for file_data in lecture_graph.get("files", []):
         db.add(
@@ -382,6 +503,7 @@ def graph_to_db(db: Session, user: User, lecture_graph: dict[str, Any]) -> None:
                 lecture_priority=topic_data.get("lecture_priority"),
                 difficulty=topic_data.get("difficulty"),
                 lectures_json=json.dumps(topic_data.get("lectures", []), ensure_ascii=False),
+                position=topic_data.get("position"),
             )
         )
 
@@ -543,11 +665,16 @@ def build_quiz_questions(topics: dict[str, dict[str, Any]]) -> list[dict[str, An
     questions = []
     for index, (topic_id, topic_data) in enumerate(topic_items):
         correct_summary = topic_data.get("summary", "No summary available yet.")
-        distractor_pool = [
-            other_data.get("summary", "No summary available yet.")
-            for other_id, other_data in topic_items
-            if other_id != topic_id
-        ]
+        # Skip distractors identical to the answer (or to each other), otherwise
+        # one question can show two "correct" options or duplicate choices.
+        distractor_pool = list(
+            dict.fromkeys(
+                other_data.get("summary", "No summary available yet.")
+                for other_id, other_data in topic_items
+                if other_id != topic_id
+            )
+        )
+        distractor_pool = [summary for summary in distractor_pool if summary != correct_summary]
         rng = random.Random(f"studygraph-{topic_id}")
         distractors = distractor_pool[:]
         rng.shuffle(distractors)
@@ -790,7 +917,8 @@ def validate_graph(lecture_graph: dict[str, Any]) -> dict[str, Any]:
 
 
 def unique_topic_id(candidate_id: str, existing_topics: dict[str, Any], new_topics: dict[str, Any]) -> str:
-    base_id = slugify(candidate_id)
+    # Topic.id is VARCHAR(120); leave room for a "_N" or "_uN" suffix.
+    base_id = slugify(candidate_id)[: MAX_ID_LENGTH - 20]
     if base_id not in existing_topics and base_id not in new_topics:
         return base_id
 
@@ -807,11 +935,17 @@ def merge_graph_fragments(base_graph: dict[str, Any], fragment: dict[str, Any]) 
     existing_topics = base_graph.setdefault("topics", {})
     new_topics: dict[str, dict[str, Any]] = {}
     topic_id_map: dict[str, str] = {}
+    next_position = max(
+        (topic.get("position") or 0 for topic in existing_topics.values() if isinstance(topic.get("position"), int)),
+        default=0,
+    ) + 1
 
     for original_topic_id, topic_data in fragment.get("topics", {}).items():
         final_topic_id = unique_topic_id(original_topic_id, existing_topics, new_topics)
         topic_id_map[original_topic_id] = final_topic_id
         copied_topic = dict(topic_data)
+        copied_topic["position"] = next_position
+        next_position += 1
         copied_topic["connections"] = [dict(connection) for connection in topic_data.get("connections", [])]
         new_topics[final_topic_id] = copied_topic
 
@@ -870,7 +1004,7 @@ def login_page():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
-        next_url = request.form.get("next") or url_for("home")
+        next_url = safe_next_url(request.form.get("next"))
 
         db = get_db()
         user = db.scalar(select(User).where(User.email == email))
@@ -884,7 +1018,7 @@ def login_page():
         flash("Welcome back.", "success")
         return redirect(next_url)
 
-    return render_template("login.html", next_url=request.args.get("next") or url_for("home"))
+    return render_template("login.html", next_url=safe_next_url(request.args.get("next")))
 
 
 @app.route("/signup", methods=["GET", "POST"])
@@ -1160,7 +1294,9 @@ def ask_ai_page():
         selected_topic_ids = request.form.getlist("topics")
         question_text = request.form.get("question", "").strip()
         try:
-            answer_text = build_multi_topic_answer(g.current_user, selected_topic_ids, topics, question_text)
+            answer_text = build_multi_topic_answer(
+                g.current_user, selected_topic_ids, topics, question_text, default_api_key=OPENAI_API_KEY
+            )
 
             if answer_text:
                 raw_html = markdown.markdown(
@@ -1237,10 +1373,14 @@ def import_graph_json_page():
         return redirect(url_for("library_page"))
 
     try:
-        lecture_graph = validate_graph(json.loads(raw_json))
+        payload = json.loads(raw_json)
     except json.JSONDecodeError:
         flash("Invalid JSON payload.", "error")
         return redirect(url_for("library_page"))
+    if not isinstance(payload, dict) or not isinstance(payload.get("topics", {}), dict):
+        flash("JSON must be an object with a \"topics\" map.", "error")
+        return redirect(url_for("library_page"))
+    lecture_graph = validate_graph(payload)
 
     db = get_db()
     graph_to_db(db, g.current_user, lecture_graph)
@@ -1270,5 +1410,6 @@ def lecture_graph_template_page():
 if __name__ == "__main__":
     from waitress import serve
 
-    print("StudyGraph running on: http://127.0.0.1:5000")
-    serve(app, host="0.0.0.0", port=5000, threads=8)
+    port = int(os.environ.get("PORT", "5000"))
+    print(f"StudyGraph running on: http://127.0.0.1:{port}")
+    serve(app, host="0.0.0.0", port=port, threads=8)

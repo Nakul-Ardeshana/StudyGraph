@@ -272,6 +272,16 @@ def normalize_fragment_files(fragment: dict[str, Any], saved_files: list[dict[st
     return fragment
 
 
+def recent_topic_items(topics: dict[str, dict[str, Any]], limit: int = MAX_EXISTING_TOPICS) -> list[tuple[str, dict[str, Any]]]:
+    """The most recently added topics, oldest first. The graph loaded from the DB is
+    sorted by title, so slicing it directly would send the alphabetically-last
+    topics instead of the recent ones. Topics without a position (created before
+    positions were tracked) count as oldest and keep their existing order."""
+    items = list(topics.items())
+    items.sort(key=lambda item: item[1].get("position") if isinstance(item[1].get("position"), int) else 0)
+    return items[-limit:] if limit > 0 else []
+
+
 def build_graph_generation_prompt(current_graph: dict[str, Any], saved_files: list[dict[str, Any]]) -> str:
     source_files = [file_info["name"] for file_info in saved_files]
     uploaded_files_payload = [
@@ -288,9 +298,8 @@ def build_graph_generation_prompt(current_graph: dict[str, Any], saved_files: li
             "title": topic_data.get("title"),
             "summary": (topic_data.get("summary") or "")[:MAX_SUMMARY_CHARS],
         }
-        for topic_id, topic_data in current_graph.get("topics", {}).items()
+        for topic_id, topic_data in recent_topic_items(current_graph.get("topics", {}))
     ]
-    existing_topic_reference = existing_topic_reference[-MAX_EXISTING_TOPICS:]
 
     prompt = {
         "task": "Build a detailed StudyGraph JSON fragment for the uploaded batch.",
