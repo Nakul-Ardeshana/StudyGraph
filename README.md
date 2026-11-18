@@ -17,7 +17,7 @@ Before running the app, install:
 - Windows 10 or newer
 - Python 3.10+
 - PostgreSQL
-- An OpenAI API key — I have included my API key, and it is valid until the end of summer.
+- An OpenAI API key (set `OPENAI_API_KEY` in `.env`, or each user can save their own key in the app)
 
 The Windows launcher creates a virtual environment, installs Python dependencies from `requirements.txt`, and uses `studygraph_setup_env.py` to create or update the `.env` file automatically.
 
@@ -133,6 +133,37 @@ Open `.env` and add:
 OPENAI_API_KEY=your_openai_api_key_here
 ```
 
+## Running Tests
+
+The test suite uses pytest. It runs against a temporary SQLite database and mocks every OpenAI call, so it needs no PostgreSQL server, no API key, and costs nothing to run.
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest
+```
+
+On Windows with the launcher's virtual environment:
+
+```bat
+.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.venv\Scripts\python.exe -m pytest
+```
+
+To run the same tests against PostgreSQL, point `TEST_DATABASE_URL` at an empty, disposable database (the tests drop and recreate its tables):
+
+```bash
+TEST_DATABASE_URL=postgresql+psycopg://postgres:password@localhost:5432/studygraph_test python -m pytest
+```
+
+What is covered (`tests/`):
+
+- `test_routes.py`: login/signup/logout, auth redirects, every page rendering, upload validation and batching, JSON import/export, topic and file deletion, quiz answers, Ask AI, and two users storing the same topic ids.
+- `test_graph_validation.py`: the JSON validation layer (schema normalization, duplicate and reverse-duplicate link removal, the 2-strongest-connections cap, fragment merging and id remapping, quiz options).
+- `test_ai.py`: structured-output parsing, file cleanup on OpenAI, rejecting hallucinated file ids, and the 20-topic / 80-character prompt cap.
+- `test_config.py`: config helpers and the schema upgrade for older databases.
+
+Databases created by older versions of StudyGraph get the new `topics.position` column added automatically on startup.
+
 ## Project notes
 
 StudyGraph expects generated graph fragments to be valid JSON with lectures, topics, lecture metadata, and file metadata. Topics are designed to be small, readable study units with sparse, useful connections instead of dense clutter.
@@ -158,12 +189,13 @@ StudyGraph expects generated graph fragments to be valid JSON with lectures, top
 .
 ├── static/
 ├── templates/
+├── tests/
 ├── uploads/
 ├── .env.example
 ├── app.py
-├── contributions.txt
 ├── README.md
 ├── requirements.txt
+├── requirements-dev.txt
 ├── run_app.bat
 ├── studygraph_ai.py
 └── studygraph_setup_env.py
@@ -183,4 +215,4 @@ There are several areas where StudyGraph could be improved in the future:
   Right now, full uploaded files are sent for processing. In the future, the backend could strip out unrelated or unnecessary content before sending files to the AI. This would allow larger batches of materials to be processed and could also reduce API costs.
 
 - **Remove file reprocessing from the library page**  
-  The library page currently includes an option to reprocess uploaded files. Removing this feature would simplify the backend because the app would no longer need to keep the original uploaded files after they have already been processed.
+  The library page currently includes an option to reprocess uploaded files. Removing this feature would simplify the backend because the app would no longer need to keep the original uploaded files after they have already been processed.
